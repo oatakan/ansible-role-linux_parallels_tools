@@ -10,5 +10,4 @@
       register: install_parallels_tools
   rescue:
     - name: attempt to fix and retry
-      ansible.builtin.include_tasks:
-        name: fix_and_retry.yml
+      ansible.builtin.include_tasks: fix_and_retry.yml
