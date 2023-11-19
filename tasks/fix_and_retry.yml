@@ -1,0 +1,52 @@
+---
+
+- name: apply fix and install
+  block:
+    - name: ensure directory exists
+      ansible.builtin.file:
+        path: /tmp/prl-tools-build
+        state: directory
+        mode: '0755'
+
+    - name: copy mount files
+      ansible.builtin.copy:
+        src: /mnt/
+        dest: /tmp/prl-tools-build/
+        remote_src: true
+        mode: '0755'
+
+    - name: extract prl_mod.tar.gz
+      ansible.builtin.unarchive:
+        src: /tmp/prl-tools-build/kmods/prl_mod.tar.gz
+        dest: /tmp/prl-tools-build/kmods
+        remote_src: true
+
+    - name: modify inode.c
+      ansible.builtin.replace:
+        path: /tmp/prl-tools-build/kmods/prl_fs/SharedFolders/Guest/Linux/prl_fs/inode.c
+        regexp: '^(#if LINUX_VERSION_CODE >= KERNEL_VERSION\(5,) 1[8,9](, 0\))$'
+        replace: '\1 14\2'
+
+    - name: ensure prl_mod.tar.gz doesn't exist
+      ansible.builtin.file:
+        path: /tmp/prl-tools-build/kmods/prl_mod.tar.gz
+        state: absent
+
+    - name: create prl_mod.tar.gz archive
+      community.general.archive:
+        path: /tmp/prl-tools-build/kmods
+        dest: /tmp/prl-tools-build/kmods/prl_mod.tar.gz
+        format: gz
+        mode: '0755'
+
+    - name: install Parallels Tools
+      ansible.builtin.shell: /tmp/prl-tools-build/install --install-unattended-with-deps
+      changed_when: false
+      args:
+        chdir: /tmp/prl-tools-build
+      register: install_parallels_tools
+  always:
+    - name: remove build files
+      ansible.builtin.file:
+        path: /tmp/prl-tools-build
+        state: absent

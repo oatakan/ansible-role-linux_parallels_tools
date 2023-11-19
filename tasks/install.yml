@@ -1,0 +1,14 @@
+---
+
+- name: install
+  block:
+    - name: install Parallels Tools
+      ansible.builtin.shell: '{{ parallels_tools_mounted_drive }}/install --install-unattended-with-deps'
+      changed_when: false
+      args:
+        chdir: '{{ parallels_tools_mounted_drive }}'
+      register: install_parallels_tools
+  rescue:
+    - name: attempt to fix and retry
+      ansible.builtin.include_tasks:
+        name: fix_and_retry.yml

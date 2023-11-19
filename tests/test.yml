@@ -1,0 +1,4 @@
+---
+- hosts: localhost
+  roles:
+    - oatakan.linux_parallels_tools

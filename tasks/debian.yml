@@ -1,0 +1,10 @@
+---
+
+- name: install required packages
+  ansible.builtin.apt:
+    name:
+      - dkms
+      - libelf-dev
+      - linux-headers-{{ ansible_kernel | default(kernel_release.stdout) }}
+      - build-essential
+    state: present

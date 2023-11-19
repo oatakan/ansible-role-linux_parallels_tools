@@ -1,0 +1,11 @@
+---
+
+- name: install required packages
+  ansible.builtin.yum:
+    name:
+      - make
+      - kernel-devel
+      - gcc
+      - elfutils-libelf-devel
+      - perl
+    state: present

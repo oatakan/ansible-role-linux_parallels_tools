@@ -1,0 +1,88 @@
+---
+
+- name: check if .prlctl_version is created
+  ansible.builtin.stat:
+    path: '{{ ansible_user_dir | default("") }}/.prlctl_version'
+  register: check_prlctl_version_file
+  ignore_errors: true
+
+- name: parallels version
+  block:
+    - name: get parallels version.
+      ansible.builtin.slurp:
+        src: '{{ ansible_user_dir }}/.prlctl_version'
+      register: get_parallels_version
+
+    - name: set parallels version.
+      ansible.builtin.set_fact:
+        parallels_version: "{{ get_parallels_version['content'] | b64decode }}"
+  when: check_prlctl_version_file.stat.exists
+
+- name: include os specific tasks
+  ansible.builtin.include_tasks: '{{ _os_family }}.yml'
+  vars:
+    _os_family: '{{ ansible_os_family | default("RedHat") | lower }}'
+
+- name: check for mounted iso location
+  ansible.builtin.stat:
+    path: '{{ parallels_tools_mounted_drive }}/kmods/prl_mod.tar.gz'
+    get_checksum: false
+  register: check_mounted_iso_location
+
+- name: iso file
+  block:
+    - name: check for iso file
+      ansible.builtin.stat:
+        path: '{{ parallels_tools_iso_file }}'
+        get_checksum: false
+      register: check_parallels_tools_iso_file
+
+    - name: fail if no valid source found
+      ansible.builtin.fail:
+        msg: "{{ _msg.split('\n')[:-1] }}"
+      vars:
+        _msg: |
+          one of the following must be specified:
+            - mounted iso at {{ parallels_tools_mounted_drive }} via parallels_tools_mounted_drive variable
+            - valid iso file at {{ parallels_tools_iso_file }} via parallels_tools_iso_file variable
+            - download url specified with parallels_tools_download_url variable
+      when:
+        - not check_mounted_iso_location.stat.exists
+        - not check_parallels_tools_iso_file
+        - not (parallels_tools_download_url | length)
+
+    - name: download iso file if needed
+      ansible.builtin.get_url:
+        url: '{{ parallels_tools_download_url }}'
+        dest: '{{ parallels_tools_iso_file }}'
+        mode: '0755'
+      when:
+        - not check_parallels_tools_iso_file.stat.exists
+        - parallels_tools_download_url | length
+
+    - name: mount parallels tools iso
+      ansible.posix.mount:
+        src: "{{ parallels_tools_iso_file }}"
+        path: '{{ parallels_tools_mounted_drive }}'
+        fstype: iso9660
+        opts: loop
+        state: mounted
+
+    - name: install
+      ansible.builtin.include_tasks: install.yml
+
+  always:
+    - name: unmount parallels tools iso
+      ansible.posix.mount:
+        path: '{{ parallels_tools_mounted_drive }}'
+        state: absent
+
+    - name: remove iso file
+      ansible.builtin.file:
+        path: "{{ parallels_tools_iso_file }}"
+        state: absent
+  when: not check_mounted_iso_location.stat.exists
+
+- name: install
+  ansible.builtin.include_tasks: install.yml
+  when: check_mounted_iso_location.stat.exists
